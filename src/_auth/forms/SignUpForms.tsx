@@ -15,13 +15,23 @@ import { Input } from "@/components/ui/input";
 import { SignUpValidation } from "@/lib/validation";
 import { z } from "zod";
 import Loader from "@/components/shared/Loader";
-import { Link } from "react-router-dom";
-import { createUserAccount } from "@/lib/appwrite/api";
+import { Link, useNavigate } from "react-router-dom";
+
+import { useToast } from "@/components/ui/use-toast";
+import {
+  useCreateAccountMutation,
+  useSignInMutation,
+} from "@/lib/react-query/queryMutation";
+import { useUserContext } from "@/context/AuthContext";
 
 const SignUpForms = () => {
-  // const { toast } = useToast()
-  const isLoading = false;
+  const { toast } = useToast();
+  const { checkAuthUser, isLoading } = useUserContext();
+  const navigate = useNavigate();
+  // mutation
+  const { mutateAsync: createUserAccount } = useCreateAccountMutation();
 
+  const { mutateAsync: signInAccount } = useSignInMutation();
   // 1. Define your form.
   const form = useForm<z.infer<typeof SignUpValidation>>({
     resolver: zodResolver(SignUpValidation),
@@ -37,6 +47,31 @@ const SignUpForms = () => {
   async function onSubmit(values: z.infer<typeof SignUpValidation>) {
     const createUser = await createUserAccount(values);
     console.log(createUser);
+
+    if (!createUser)
+      return toast({
+        title: "Sign up failed",
+      });
+
+    const session = await signInAccount({
+      email: values.email,
+      password: values.password,
+    });
+
+    if (!session)
+      return toast({
+        title: "Sign in failed",
+      });
+
+    const isLoggedIn = await checkAuthUser();
+    if (isLoggedIn) {
+      form.reset();
+      navigate("/");
+    } else {
+      return toast({
+        title: "failed login",
+      });
+    }
   }
 
   return (
